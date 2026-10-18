@@ -156,6 +156,36 @@ textarea {
 .frame p { margin: 0; background: var(--surface); padding: 2px 6px; margin-left: -6px; justify-self: start; max-width: 60ch; }
 .frame .constraint { font-family: var(--mono); font-size: 13px; color: var(--side); }
 
+/* 3 shot story */
+.story { display: grid; gap: 16px; }
+.story-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.story-field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.story-field:first-child { flex: 1 1 220px; }
+.story-form input { font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.story-head { display: grid; gap: 4px; }
+.story-head h3 { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.story-head p { margin: 0; color: var(--muted); max-width: 62ch; }
+.shots { display: grid; gap: 10px; }
+.shot { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: 112px 1fr; gap: 14px; align-items: start; }
+.shot > div { min-width: 0; display: grid; gap: 6px; }
+.shot svg { width: 112px; height: auto; display: block; border-radius: 4px; background: var(--accent-soft); }
+.shot .size { font-family: var(--display); font-size: 20px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.shot .size button { font-family: var(--body); font-size: 12.5px; font-weight: 500; letter-spacing: 0; text-transform: none; background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted); }
+.shot p { margin: 0; }
+.shot svg .fig { fill: var(--accent); }
+.shot svg .gnd { fill: var(--line); }
+.shot .how { font-size: 13.5px; color: var(--accent); font-family: var(--mono); }
+.story .tip { margin: 0; font-size: 13.5px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 10px; max-width: 62ch; }
+.story .tip b { color: var(--ink); font-weight: 600; }
+.story .tip:empty { display: none; }
+.loglist { display: grid; gap: 4px; font-size: 13.5px; }
+.loglist div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.loglist span:last-child { color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+@media (max-width: 480px) {
+  .shot { grid-template-columns: 76px 1fr; gap: 12px; }
+  .shot svg { width: 76px; }
+}
+
 /* cheat sheet */
 .sheet { display: grid; gap: 18px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
@@ -193,6 +223,7 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
   <nav class="tabs" role="tablist">
     <button role="tab" id="tab-quests" aria-selected="true" data-tab="quests">Quests</button>
     <button role="tab" id="tab-daily" aria-selected="false" data-tab="daily">Today's side quest</button>
+    <button role="tab" id="tab-story" aria-selected="false" data-tab="story">3 Shot Story</button>
     <button role="tab" id="tab-sheet" aria-selected="false" data-tab="sheet">Cheat sheet</button>
   </nav>
 
@@ -219,6 +250,39 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
         <button class="btn ghost" id="dailyReroll">Roll another</button>
       </div>
       <p class="label" id="dailyStreak" style="margin:0"></p>
+    </div>
+  </section>
+
+  <section id="panel-story" hidden>
+    <div class="story">
+      <form class="story-form" id="storyForm">
+        <label for="place" class="story-field">Where are you filming?
+          <input id="place" type="text" autocomplete="off" placeholder="e.g. coffee shop, beach, my garage" value="coffee shop">
+        </label>
+        <label for="tod" class="story-field">Light
+          <select id="tod">
+            <option value="any">Any time</option>
+            <option value="morning">Morning</option>
+            <option value="golden">Golden hour</option>
+            <option value="night">Night</option>
+          </select>
+        </label>
+        <button class="btn" type="submit">Brainstorm</button>
+      </form>
+
+      <div class="story-head">
+        <div class="label" id="storyPlace"></div>
+        <h3 id="storyTitle"></h3>
+        <p id="storyLine"></p>
+      </div>
+      <div class="shots" id="shots"></div>
+      <p class="tip" id="storyLight"></p>
+      <p class="tip"><b>Edit it:</b> play wide → medium → close to set the scene and land on the emotion. Or open on the close-up as a hook, then pull back to reveal where we are.</p>
+      <div class="row">
+        <button class="btn" id="storyLog">Shot it · +30 XP</button>
+        <button class="btn ghost" id="storyNew">New story here</button>
+      </div>
+      <div id="storyLogList"></div>
     </div>
   </section>
 
@@ -461,7 +525,7 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
 
   const KEY = "pocket3-quest-v1";
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
-  let state = Object.assign({ done: {}, notes: {}, daily: {}, open: {} }, load());
+  let state = Object.assign({ done: {}, notes: {}, daily: {}, open: {}, stories: [] }, load());
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
 
   const $ = (id) => document.getElementById(id);
@@ -473,6 +537,7 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
     let xp = 0;
     allQuests.forEach((q) => { if (state.done[q.id]) xp += q.xp; });
     xp += Object.keys(state.daily).length * 25;
+    xp += state.stories.length * 30;
     return xp;
   }
 
@@ -579,10 +644,237 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
   });
   $("dailyReroll").addEventListener("click", () => { roll++; renderDaily(); });
 
+  // 3 Shot Story: match the typed place to a location type, then pick one of its stories.
+  // Each story is [title, logline, wide, medium, close]; {place} is filled with what was typed.
+  const PLACES = [
+    { keys: ["coffee", "cafe", "café", "bakery", "tea", "diner", "restaurant", "brunch"], stories: [
+      ["First sip", "A morning starts the moment the cup is handed over.",
+        "The café from across the street as someone pushes the door open.",
+        "The barista building the drink: grind, tamp, pour.",
+        "Milk swirling into the cup, then a hand lifting it away."],
+      ["The regular", "Same seat, same order, a different day outside the window.",
+        "The whole room from a corner, people talking and typing.",
+        "Your subject at the window seat, looking out.",
+        "Steam curling off the cup with window light behind it."]
+    ]},
+    { keys: ["beach", "ocean", "sea", "shore", "coast", "surf", "sand"], stories: [
+      ["Last light", "One more walk before the sun is gone.",
+        "The horizon and rolling waves, with a small figure walking the shoreline.",
+        "Your subject at the waterline, shoes in hand, looking out.",
+        "Footprints in wet sand as a wave washes over them."],
+      ["Into the water", "The moment of hesitation before the cold.",
+        "The beach from the top of a dune or path as your subject heads down.",
+        "Following behind as they wade in up to their knees.",
+        "Water hitting their shins, shot in slow motion."]
+    ]},
+    { keys: ["city", "street", "downtown", "sidewalk", "crosswalk", "alley", "urban", "neighborhood", "block"], stories: [
+      ["The crossing", "Everyone in the city is going somewhere.",
+        "The intersection from a high spot, cars and walkers flowing through.",
+        "Your subject waiting at the crosswalk as the signal changes.",
+        "Shoes stepping off the curb into the street."],
+      ["Window shopping", "Something in a window stops them mid-stride.",
+        "The block with your subject walking toward camera from far away.",
+        "They slow down and turn toward a shop window.",
+        "The window's reflection with their face behind the glass."]
+    ]},
+    { keys: ["park", "forest", "woods", "trail", "hike", "garden", "nature", "mountain", "field"], stories: [
+      ["The trail", "Going further than planned.",
+        "The trail disappearing into the trees, your subject entering small in frame.",
+        "Walking alongside them with trees sliding past in the foreground.",
+        "A boot pressing into dirt and leaves."],
+      ["The view", "The climb pays off.",
+        "The open view your subject is heading toward.",
+        "Them reaching the top and stopping to take it in, from behind.",
+        "Their face as they catch their breath, wind moving their hair."]
+    ]},
+    { keys: ["kitchen", "cook", "bake", "home", "apartment", "house", "dinner", "breakfast"], stories: [
+      ["Breakfast", "Small rituals make the day.",
+        "The kitchen in morning window light as your subject walks in.",
+        "Cracking eggs into the pan, over the shoulder.",
+        "The egg hitting the pan and sizzling, in slow motion."],
+      ["Made from scratch", "Something good takes time.",
+        "The counter covered in ingredients, your subject at work.",
+        "Hands kneading, chopping or stirring.",
+        "The finished dish set down, steam rising."]
+    ]},
+    { keys: ["gym", "workout", "court", "skate", "basketball", "soccer", "football", "track", "pool", "sport"], stories: [
+      ["One more", "The last rep is the one that counts.",
+        "The gym or court nearly empty, your subject in the middle.",
+        "Them mid-effort: a lift, a shot, a sprint.",
+        "Chalk, sweat or the ball through the net, in slow motion."],
+      ["Warm-up", "The quiet before the game.",
+        "The field or court with lights coming on.",
+        "Your subject lacing up on a bench.",
+        "Hands pulling the laces tight."]
+    ]},
+    { keys: ["car", "road", "drive", "highway", "gas station", "parking", "truck"], stories: [
+      ["Road trip", "No plan, just the road.",
+        "The car passing through frame on an open road, camera on the tripod.",
+        "The driver from the passenger seat, window light on their face.",
+        "A hand tapping the wheel to the music."],
+      ["Fuel stop", "A pause in the middle of nowhere.",
+        "The gas station alone under its lights.",
+        "Your subject leaning on the car while it fills.",
+        "The pump numbers ticking up."]
+    ]},
+    { keys: ["garage", "workshop", "studio", "desk", "office", "workspace", "shop class", "lab"], stories: [
+      ["Making", "An idea turning into a thing.",
+        "The workspace with tools on the wall, your subject at the bench.",
+        "Them working, over the shoulder.",
+        "The tool meeting the material: sawdust, sparks or a brush stroke."],
+      ["Late night", "Everyone else has gone home.",
+        "The room dark except for one lamp over the desk.",
+        "Your subject leaning in, focused.",
+        "Fingers on the keys, mouse or pencil."]
+    ]},
+    { keys: ["market", "store", "mall", "farmers", "grocery", "thrift", "bookstore"], stories: [
+      ["The find", "Searching until something feels right.",
+        "The aisles or stalls from a high spot, people moving through.",
+        "Your subject browsing and picking something up.",
+        "Their hand turning the item over to look at it."],
+      ["Market day", "Everyone's selling, everyone's talking.",
+        "The busy market from the edge.",
+        "A seller handing something across the table.",
+        "Coins or produce changing hands."]
+    ]},
+    { keys: ["rooftop", "bridge", "skyline", "overlook", "balcony", "view", "tower"], stories: [
+      ["Above it all", "The city looks quiet from up here.",
+        "The skyline as the lights come on.",
+        "Your subject leaning on the railing, from behind.",
+        "The city reflected in their sunglasses, or wind in their hair."]
+    ]},
+    { keys: ["lake", "river", "dock", "pier", "waterfall", "creek", "harbor", "boat"], stories: [
+      ["The dock", "Doing nothing on purpose.",
+        "The dock stretching out over the water, your subject at the end.",
+        "Them sitting with their feet hanging over the edge.",
+        "Ripples spreading from their toes."],
+      ["Cast", "Waiting is the whole point.",
+        "The water with your subject small on the bank.",
+        "The cast, from the side.",
+        "The line tightening, or the float bobbing."]
+    ]},
+    { keys: ["train", "station", "airport", "bus", "subway", "metro", "terminal"], stories: [
+      ["Departure", "Leaving always feels bigger than it is.",
+        "The platform with the train pulling in.",
+        "Your subject with their bag, watching the doors.",
+        "Their ticket, phone or hand on the bag strap."]
+    ]},
+    { keys: ["backyard", "yard", "dog", "cat", "pet", "porch", "patio"], stories: [
+      ["Fetch", "The best part of their day.",
+        "The yard as the dog sprints across it.",
+        "Your subject winding up to throw.",
+        "The dog's face as it catches, in slow motion."],
+      ["Porch light", "The day winding down.",
+        "The house from the street, porch light on.",
+        "Your subject settling into a chair.",
+        "A drink set down on the rail."]
+    ]},
+    { keys: ["concert", "show", "party", "festival", "bar", "club", "wedding"], stories: [
+      ["The drop", "The crowd waits for one moment.",
+        "The crowd and stage lights from the back.",
+        "Your subject in the crowd, singing along.",
+        "Hands in the air against the stage lights."]
+    ]}
+  ];
+  const ANY_PLACE = [
+    ["Arrival", "Getting somewhere and seeing it for the first time.",
+      "{place} from far back, with your subject walking into frame.",
+      "Your subject stopping to take in one thing about {place}.",
+      "That one thing up close: a sign, a texture, an object only {place} has."],
+    ["The ritual", "What people come to {place} to do.",
+      "{place} with its light: where it comes from and what time it feels like.",
+      "Someone doing the thing people come to {place} for.",
+      "Hands or faces mid-action, in slow motion."],
+    ["Leaving", "One last look before going.",
+      "{place} with your subject heading for the exit.",
+      "Them turning back for one more look.",
+      "A detail they leave behind, or take with them."]
+  ];
+  const MOVES = {
+    wide: ["Static on the mini tripod · 5 s", "Slow push-in · Tilt Locked · 6 s", "Slow joystick pan · hold both ends · 6 s",
+      "Reveal from behind a foreground object · 5 s", "Tilt up from the ground · 5 s"],
+    medium: ["Eye level · Follow mode · 4 s", "Parallax slide past the foreground · Tilt Locked · 4 s",
+      "Track from behind with ActiveTrack · 5 s", "Over the shoulder · static · 4 s", "Half orbit with ActiveTrack · 5 s"],
+    close: ["Slow Motion · 4K 120fps · 3 s", "Static · as close as the lens will focus · 3 s", "Tiny push-in · 3 s",
+      "Low angle from the surface · 3 s", "Tilt up from the detail to the face · 4 s"]
+  };
+  const LIGHT = {
+    any: "",
+    morning: "<b>Morning light:</b> soft and cool. Put windows or the low sun to the side of your subject, and lock white balance around 5600K.",
+    golden: "<b>Golden hour:</b> shoot the wide first while the sun is still up. The light changes fast, so get all three shots in 20 minutes.",
+    night: "<b>Night:</b> use Night mode for the wide shot and look for signs, lamps and windows to light your subject."
+  };
+  const FRAMES = {
+    wide: '<rect class="gnd" x="0" y="66" width="160" height="24"/><path class="gnd" d="M0 66 L40 44 L70 60 L105 36 L160 66Z"/><circle class="fig" cx="112" cy="54" r="3.2"/><rect class="fig" x="109" y="57.5" width="6" height="9" rx="2"/>',
+    medium: '<circle class="fig" cx="80" cy="34" r="13"/><path class="fig" d="M50 90 C50 62 60 52 80 52 C100 52 110 62 110 90Z"/>',
+    close: '<circle class="fig" cx="80" cy="58" r="36"/>'
+  };
+  const SIZES = ["wide", "medium", "close"];
+  const pick = (arr, not) => {
+    if (arr.length < 2) return arr[0];
+    let x; do { x = arr[Math.floor(Math.random() * arr.length)]; } while (x === not);
+    return x;
+  };
+  let story = null;
+
+  function storiesFor(place) {
+    const p = place.toLowerCase();
+    const hit = PLACES.find((g) => g.keys.some((k) => p.includes(k)));
+    return hit ? hit.stories : ANY_PLACE;
+  }
+  function brainstorm(keepTitle) {
+    const place = $("place").value.trim() || "your spot";
+    const pool = storiesFor(place);
+    const s = pick(pool, keepTitle ? pool.find((x) => x[0] === keepTitle) : null);
+    const fill = (t) => t.replace(/\{place\}/g, place).replace(/^./, (c) => c.toUpperCase());
+    story = { place, pool, s, title: s[0], line: fill(s[1]),
+      shots: SIZES.map((size, i) => ({ size, what: fill(s[i + 2]), how: pick(MOVES[size]) })) };
+    renderStory();
+  }
+  function swapShot(i) {
+    const size = SIZES[i], fill = (t) => t.replace(/\{place\}/g, story.place).replace(/^./, (c) => c.toUpperCase());
+    const others = story.pool.map((x) => fill(x[i + 2]));
+    story.shots[i] = { size, what: pick(others, story.shots[i].what), how: pick(MOVES[size], story.shots[i].how) };
+    renderStory();
+  }
+  function renderStory() {
+    $("storyPlace").textContent = story.place;
+    $("storyTitle").textContent = story.title;
+    $("storyLine").textContent = story.line;
+    $("shots").innerHTML = story.shots.map((sh, i) => `<div class="shot">
+      <svg viewBox="0 0 160 90" role="img" aria-label="${sh.size} shot framing">${FRAMES[sh.size]}</svg>
+      <div>
+        <div class="size">${sh.size}<button data-swap="${i}">Swap</button></div>
+        <p>${esc(sh.what)}</p>
+        <p class="how">Try: ${esc(sh.how)}</p>
+      </div>
+    </div>`).join("");
+    $("storyLight").innerHTML = LIGHT[$("tod").value];
+    $("storyLog").textContent = "Shot it · +30 XP";
+  }
+  function renderStoryLog() {
+    const list = state.stories.slice().reverse().slice(0, 8);
+    $("storyLogList").innerHTML = list.length
+      ? `<div class="label">Your stories (${state.stories.length})</div><div class="loglist">${list.map((x) =>
+          `<div><span>${esc(x.title)} · ${esc(x.place)}</span><span>${esc(x.date)}</span></div>`).join("")}</div>`
+      : "";
+  }
+  $("storyForm").addEventListener("submit", (e) => { e.preventDefault(); brainstorm(); });
+  $("tod").addEventListener("change", () => { $("storyLight").innerHTML = LIGHT[$("tod").value]; });
+  $("storyNew").addEventListener("click", () => brainstorm(story && story.title));
+  $("shots").addEventListener("click", (e) => { const b = e.target.closest("[data-swap]"); if (b) swapShot(+b.dataset.swap); });
+  $("storyLog").addEventListener("click", () => {
+    if ($("storyLog").textContent.startsWith("Logged")) return;
+    state.stories.push({ title: story.title, place: story.place, date: today });
+    save(); renderStoryLog(); renderHeader();
+    $("storyLog").textContent = "Logged · nice work";
+  });
+  brainstorm(); renderStoryLog();
+
   // tabs
   document.querySelectorAll("[data-tab]").forEach((t) => t.addEventListener("click", () => {
     document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === t));
-    ["quests", "daily", "sheet"].forEach((p) => { $("panel-" + p).hidden = p !== t.dataset.tab; });
+    ["quests", "daily", "story", "sheet"].forEach((p) => { $("panel-" + p).hidden = p !== t.dataset.tab; });
     try { localStorage.setItem(KEY + "-tab", t.dataset.tab); } catch (e) {}
   }));
   try { const t = localStorage.getItem(KEY + "-tab"); if (t) document.querySelector(`[data-tab="${t}"]`)?.click(); } catch (e) {}
@@ -595,9 +887,9 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
   let armed = false;
   $("reset").addEventListener("click", () => {
     if (!armed) { armed = true; $("reset").textContent = "Tap again to erase"; $("resetMsg").textContent = ""; return; }
-    armed = false; state = { done: {}, notes: {}, daily: {}, open: {} }; save();
+    armed = false; state = { done: {}, notes: {}, daily: {}, open: {}, stories: [] }; save();
     $("reset").textContent = "Reset all progress"; $("resetMsg").textContent = "Progress cleared";
-    renderQuests(); renderDaily(); renderHeader();
+    renderQuests(); renderDaily(); renderStoryLog(); renderHeader();
   });
 
   // open the first quest so the page shows what a quest looks like
