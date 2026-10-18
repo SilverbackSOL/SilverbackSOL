@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5e8c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pocket 3">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Pocket 3 Quest Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a camera-OSD header (rank + XP as a timecode bar), tabbed body; quests are a single column of chapter groups. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5b6878;
+  --line: #d3dae2;
+  --accent: #1f5e8c;      /* gimbal-steel blue */
+  --accent-soft: #dce9f4;
+  --side: #8a5a12;        /* side quest amber */
+  --side-soft: #f6ead6;
+  --rec: #d6332b;         /* REC tally, used sparingly */
+  --done: #2d7a4b;
+  --done-soft: #dcefe3;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161c; --surface: #1a2129; --ink: #e6ebf0; --muted: #94a2b3; --line: #2c3743;
+    --accent: #6fb0e0; --accent-soft: #1d3346; --side: #e0a955; --side-soft: #3a2d18;
+    --rec: #ff5a4f; --done: #5cc285; --done-soft: #183526; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161c; --surface: #1a2129; --ink: #e6ebf0; --muted: #94a2b3; --line: #2c3743;
+  --accent: #6fb0e0; --accent-soft: #1d3346; --side: #e0a955; --side-soft: #3a2d18;
+  --rec: #ff5a4f; --done: #5cc285; --done-soft: #183526; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* standalone (home-screen) mode: keep content clear of the notch and home bar */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+}
+.wrap {
+  max-width: 760px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 56px;
+}
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* OSD header */
+.osd {
+  position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 18px 20px 16px; display: grid; gap: 12px;
+}
+.osd::before, .osd::after {
+  content: ""; position: absolute; width: 18px; height: 18px; border: 2px solid var(--muted); opacity: .5;
+}
+.osd::before { top: 8px; left: 8px; border-right: 0; border-bottom: 0; }
+.osd::after { bottom: 8px; right: 8px; border-left: 0; border-top: 0; }
+.osd-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rec { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+.rec i { width: 9px; height: 9px; border-radius: 50%; background: var(--rec); animation: blink 1.6s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .rec i { animation: none; } }
+.osd h1 { font-size: 34px; font-weight: 700; line-height: 1.05; }
+.osd p { margin: 0; color: var(--muted); max-width: 60ch; }
+.rank { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rank b { font-family: var(--display); font-size: 22px; font-weight: 600; }
+.rank span { font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 10px; border-radius: 6px; background: var(--accent-soft); overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .5s ease; }
+.ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; margin: 18px 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button {
+  background: none; border: 0; padding: 10px 14px; font-family: var(--display); font-size: 18px; font-weight: 600;
+  color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* chapters & quests */
+.chapter { margin-top: 22px; }
+.chapter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.chapter-head h2 { font-size: 24px; font-weight: 700; }
+.chapter-head small { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chapter > p { margin: 0 0 10px; color: var(--muted); max-width: 62ch; }
+.quests { display: grid; gap: 8px; }
+.quest { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.quest.done { border-color: color-mix(in srgb, var(--done) 45%, var(--line)); }
+.q-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; width: 100%; background: none; border: 0; text-align: left; }
+.check {
+  flex: none; width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); display: grid; place-items: center;
+  font-size: 14px; color: transparent;
+}
+.done .check { background: var(--done); border-color: var(--done); color: var(--surface); }
+.q-title { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.q-title b { font-weight: 600; font-size: 15.5px; }
+.done .q-title b { text-decoration: line-through; text-decoration-color: var(--muted); color: var(--muted); }
+.q-meta { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; }
+.tag.main { background: var(--accent-soft); color: var(--accent); }
+.tag.side { background: var(--side-soft); color: var(--side); }
+.xp { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; flex: none; }
+.chev { flex: none; color: var(--muted); transition: transform .2s; }
+.open .chev { transform: rotate(90deg); }
+.q-body { padding: 0 14px 14px 50px; display: grid; gap: 10px; }
+.q-body p { margin: 0; max-width: 62ch; }
+.q-body ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.q-body .tip { font-size: 13.5px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 10px; }
+.q-body .tip b { color: var(--ink); font-weight: 600; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+textarea {
+  width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+}
+.btn {
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 8px;
+  padding: 8px 14px; font-weight: 600; font-size: 14px; justify-self: start;
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.done .btn.complete { background: transparent; color: var(--done); border-color: var(--done); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* daily */
+.daily { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: grid; gap: 14px; }
+.daily .frame {
+  position: relative; border: 1px dashed var(--line); border-radius: 10px; padding: 22px 20px; display: grid; gap: 8px;
+  background: linear-gradient(var(--line), var(--line)) 33.33% 0 / 1px 100% no-repeat,
+              linear-gradient(var(--line), var(--line)) 66.66% 0 / 1px 100% no-repeat,
+              linear-gradient(var(--line), var(--line)) 0 33.33% / 100% 1px no-repeat,
+              linear-gradient(var(--line), var(--line)) 0 66.66% / 100% 1px no-repeat;
+}
+.frame h3 { font-size: 28px; font-weight: 700; line-height: 1.1; background: var(--surface); justify-self: start; padding: 0 6px; margin-left: -6px; }
+.frame p { margin: 0; background: var(--surface); padding: 2px 6px; margin-left: -6px; justify-self: start; max-width: 60ch; }
+.frame .constraint { font-family: var(--mono); font-size: 13px; color: var(--side); }
+
+/* cheat sheet */
+.sheet { display: grid; gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: grid; gap: 10px; min-width: 0; }
+.card h3 { font-size: 22px; font-weight: 700; }
+.card p { margin: 0; color: var(--muted); max-width: 62ch; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 400; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.calc { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
+.calc label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.readout { font-family: var(--mono); font-size: 28px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.foot { margin-top: 28px; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 480px) {
+  .osd h1 { font-size: 28px; }
+  .q-body { padding-left: 14px; }
+}
+</style>
+
+<div class="wrap">
+  <header class="osd">
+    <div class="osd-top">
+      <span class="rec"><i></i>REC · <span id="tc">00:00:00:00</span></span>
+      <span class="rec" id="count">0 / 0 quests</span>
+    </div>
+    <h1>Pocket 3 Quest Log</h1>
+    <p>Learn the DJI Osmo Pocket 3 one shot at a time. Main quests teach the camera. Side quests teach you to film like you mean it.</p>
+    <div class="rank"><b id="rankName">Rookie</b><span id="xpText">0 XP</span></div>
+    <div class="bar" aria-hidden="true"><div id="xpBar"></div></div>
+    <div class="ticks"><span id="rankFrom">0</span><span id="rankNext">Next: Operator at 150 XP</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-quests" aria-selected="true" data-tab="quests">Quests</button>
+    <button role="tab" id="tab-daily" aria-selected="false" data-tab="daily">Today's side quest</button>
+    <button role="tab" id="tab-sheet" aria-selected="false" data-tab="sheet">Cheat sheet</button>
+  </nav>
+
+  <section id="panel-quests">
+    <div class="filters" id="filters">
+      <button class="chip" data-f="all" aria-pressed="true">All</button>
+      <button class="chip" data-f="open" aria-pressed="false">Not done</button>
+      <button class="chip" data-f="main" aria-pressed="false">Main</button>
+      <button class="chip" data-f="side" aria-pressed="false">Side</button>
+    </div>
+    <div id="chapters"></div>
+  </section>
+
+  <section id="panel-daily" hidden>
+    <div class="daily">
+      <div class="label" id="dailyDate">Today</div>
+      <div class="frame">
+        <h3 id="dailyTitle"></h3>
+        <p id="dailyText"></p>
+        <p class="constraint" id="dailyRule"></p>
+      </div>
+      <div class="row">
+        <button class="btn" id="dailyDone">Mark done · +25 XP</button>
+        <button class="btn ghost" id="dailyReroll">Roll another</button>
+      </div>
+      <p class="label" id="dailyStreak" style="margin:0"></p>
+    </div>
+  </section>
+
+  <section id="panel-sheet" hidden>
+    <div class="sheet">
+      <div class="card">
+        <h3>Shutter speed calculator</h3>
+        <p>The 180° rule: set shutter to about 1 ÷ (2 × frame rate). Motion blur then looks like film instead of a jittery phone video. In bright sun you'll need an ND filter to hold this shutter without overexposing.</p>
+        <div class="calc">
+          <label for="fps">Frame rate
+            <select id="fps">
+              <option value="24">24 fps</option>
+              <option value="25">25 fps</option>
+              <option value="30" selected>30 fps</option>
+              <option value="48">48 fps</option>
+              <option value="50">50 fps</option>
+              <option value="60">60 fps</option>
+              <option value="100">100 fps</option>
+              <option value="120">120 fps</option>
+            </select>
+          </label>
+          <div><div class="label">Shutter</div><div class="readout" id="shutter">1/60</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Controls</h3>
+        <div class="scroll"><table>
+          <tr><th>Do this</th><th>What happens</th></tr>
+          <tr><td>Rotate the screen</td><td>Powers on. Rotate it again while on to switch between horizontal and vertical shooting.</td></tr>
+          <tr><td>Record button</td><td>Start / stop recording, or take a photo in Photo mode.</td></tr>
+          <tr><td>Function button ×1</td><td>Recenter the gimbal.</td></tr>
+          <tr><td>Function button ×2</td><td>Flip between facing forward and facing you (selfie).</td></tr>
+          <tr><td>Joystick</td><td>Pan and tilt the gimbal by hand. Set its speed in gimbal settings.</td></tr>
+          <tr><td>Double-tap / drag a box on screen</td><td>Start ActiveTrack on a subject.</td></tr>
+        </table></div>
+        <p>Button behavior can change with firmware. If something doesn't match, check the latest manual in DJI Mimo.</p>
+      </div>
+
+      <div class="card">
+        <h3>Starting presets</h3>
+        <div class="scroll"><table>
+          <tr><th>Situation</th><th>Mode</th><th>Settings to try</th></tr>
+          <tr><td>Talking to camera</td><td>Video</td><td>4K 30fps, Follow, face tracking on, wind reduction on outdoors</td></tr>
+          <tr><td>Cinematic B-roll</td><td>Video (Pro)</td><td>4K 24fps, 1/50 shutter, WB locked, Tilt Locked, slow gimbal speed</td></tr>
+          <tr><td>Action / water / pets</td><td>Slow Motion</td><td>4K 120fps, lots of light, play back at 24 or 30</td></tr>
+          <tr><td>Evening streets</td><td>Night</td><td>Keep the camera steady, find practical lights (signs, lamps)</td></tr>
+          <tr><td>Clouds, crowds, sunsets</td><td>Timelapse</td><td>Mini tripod, interval 2–5 s, at least 10 min of shooting</td></tr>
+          <tr><td>Walking through a place</td><td>Hyperlapse</td><td>Walk smoothly, pick one fixed point to keep framed</td></tr>
+          <tr><td>Color grading later</td><td>Video (Pro)</td><td>10-bit D-Log M, expose a touch bright, apply DJI's LUT in edit</td></tr>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h3>Shot vocabulary</h3>
+        <div class="scroll"><table>
+          <tr><th>Shot</th><th>Use it to</th></tr>
+          <tr><td>Wide / establishing</td><td>Show where we are.</td></tr>
+          <tr><td>Medium</td><td>Show who and what they're doing.</td></tr>
+          <tr><td>Close-up</td><td>Show emotion or a detail that matters.</td></tr>
+          <tr><td>Push-in</td><td>Build focus or tension. Move toward the subject.</td></tr>
+          <tr><td>Pull-out</td><td>Reveal context or end a scene.</td></tr>
+          <tr><td>Reveal</td><td>Start behind something, then move to show the subject.</td></tr>
+          <tr><td>Parallax</td><td>Slide sideways past a close foreground object to show depth.</td></tr>
+          <tr><td>J-cut / L-cut</td><td>Let audio lead or trail the picture across a cut.</td></tr>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h3>Progress</h3>
+        <p>Your progress is saved in this browser only. Clearing site data or switching devices starts you over.</p>
+        <div class="row">
+          <button class="btn ghost" id="reset">Reset all progress</button>
+          <span class="label" id="resetMsg"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Not affiliated with DJI. Features described for the Osmo Pocket 3; menus can shift with firmware updates.</p>
+</div>
+
+<script>
+(function () {
+  const CHAPTERS = [
+    { id: "basics", name: "Power up", blurb: "Get the camera ready and learn where everything lives.", quests: [
+      { id: "b1", kind: "main", xp: 20, title: "Wake the camera",
+        brief: "The Pocket 3 has no power switch you need to hunt for. Rotating the screen turns it on.",
+        steps: ["Rotate the screen to power on. Rotate it back to power off.", "While on, rotate the screen to switch between horizontal and vertical framing.", "Swipe up, down, left and right on the screen and note what each menu holds."],
+        tip: "<b>Why it matters:</b> vertical framing uses the sensor natively, so you don't lose quality cropping for Reels or TikTok." },
+      { id: "b2", kind: "main", xp: 20, title: "Card, app and firmware",
+        brief: "Set up once so nothing fails mid-shoot.",
+        steps: ["Insert a fast microSD card (V30 or better) and format it in the camera.", "Connect to the DJI Mimo app on your phone and install any firmware update.", "Set date and time so your clips sort correctly later."],
+        tip: "<b>Habit:</b> format the card in-camera after every backup, never on your computer." },
+      { id: "b3", kind: "main", xp: 15, title: "First ten seconds",
+        brief: "Record a clip, play it back, and delete it.",
+        steps: ["Press Record, count to ten, press it again.", "Open playback and watch the clip.", "Delete it from the camera to learn the playback controls."] },
+      { id: "b4", kind: "side", xp: 15, title: "The flip",
+        brief: "Learn the two Function button moves you'll use every day.",
+        steps: ["Press Function twice to flip the camera toward you.", "Press it twice again to flip back.", "Point the gimbal somewhere odd with the joystick, then press Function once to recenter."] }
+    ]},
+    { id: "gimbal", name: "Gimbal moves", blurb: "The gimbal is the Pocket 3's superpower. Learn to move with it instead of against it.", quests: [
+      { id: "g1", kind: "main", xp: 30, title: "Three gimbal modes",
+        brief: "Follow, Tilt Locked and FPV each make the same walk feel different.",
+        steps: ["Find the gimbal mode setting in the control menu.", "Walk the same 15-meter path three times, once per mode.", "Watch all three back to back. Write down which felt calm and which felt energetic."],
+        tip: "<b>Rule of thumb:</b> Tilt Locked for cinematic, Follow for vlogging, FPV for energy and rolls." },
+      { id: "g2", kind: "main", xp: 25, title: "Slow, steady pan",
+        brief: "Pan across a scene with the joystick so smoothly no one notices the move.",
+        steps: ["Set gimbal speed to slow in settings.", "Hold still and pan left to right across a landscape over about 8 seconds.", "Hold for 2 seconds at the start and end before and after moving."],
+        tip: "<b>Editor's secret:</b> those 2-second holds give you clean places to cut." },
+      { id: "g3", kind: "side", xp: 30, title: "Ninja walk",
+        brief: "The gimbal fixes rotation. It can't fix bounce. Your legs can.",
+        steps: ["Bend your knees slightly.", "Walk heel-to-toe, rolling your feet, keeping your upper body level.", "Film a 30-second walking shot and compare it to a normal walk."] },
+      { id: "g4", kind: "main", xp: 30, title: "ActiveTrack a friend",
+        brief: "Let the camera keep a moving subject framed.",
+        steps: ["Double-tap your subject on screen, or drag a box around them.", "Have them walk while you circle around them slowly.", "Try it again in selfie mode, where face tracking turns on by itself."] },
+      { id: "g5", kind: "side", xp: 35, title: "The orbit",
+        brief: "Circle a still subject while keeping them centered. A classic hero shot.",
+        steps: ["Pick a subject: a person, a statue, a coffee cup.", "Lock ActiveTrack on it.", "Walk a half circle around it at constant distance and speed."] }
+    ]},
+    { id: "exposure", name: "Light & exposure", blurb: "Auto mode is fine. Pro mode is where your footage starts looking intentional.", quests: [
+      { id: "e1", kind: "main", xp: 30, title: "Meet Pro mode",
+        brief: "Take manual control of ISO, shutter, exposure and white balance.",
+        steps: ["Switch Video to Pro mode.", "Change ISO and shutter and watch the image brighten and darken.", "Set screen brightness to a fixed level so you judge exposure the same way every time."] },
+      { id: "e2", kind: "main", xp: 35, title: "The 180° rule",
+        brief: "Match shutter to frame rate for natural motion blur.",
+        steps: ["Set 24fps and a 1/50 shutter (use the calculator in the cheat sheet).", "Film someone waving their hand.", "Now film it at 1/1000 shutter. Compare how choppy it looks."],
+        tip: "<b>Outdoors:</b> a slow shutter in sunlight overexposes. That's what ND filters (sold separately) are for." },
+      { id: "e3", kind: "main", xp: 20, title: "Lock white balance",
+        brief: "Auto white balance shifts color mid-clip. Lock it.",
+        steps: ["Set WB to about 5600K outdoors in daylight.", "Set about 3200K under warm indoor bulbs.", "Film a white wall at both and see the color difference."] },
+      { id: "e4", kind: "side", xp: 30, title: "Golden hour",
+        brief: "Shoot the hour before sunset. Light does half the work.",
+        steps: ["Put the sun behind your subject for a glowing rim of light.", "Then turn them to face it for soft, warm skin.", "Capture 5 clips in under 20 minutes. The light changes fast."] },
+      { id: "e5", kind: "side", xp: 30, title: "Slow-mo splash",
+        brief: "Find something that moves fast and make it beautiful.",
+        steps: ["Switch to Slow Motion at 4K 120fps.", "Film water pouring, a dog shaking, or hair flipping in bright light.", "Play it back. Slow-mo needs lots of light, so retry outside if it looks noisy."] },
+      { id: "e6", kind: "side", xp: 25, title: "After dark",
+        brief: "The 1-inch sensor is good in low light. Test it.",
+        steps: ["Switch to Night mode.", "Film a street with signs, lamps or headlights.", "Compare one clip in regular Video mode."] }
+    ]},
+    { id: "story", name: "Composition & story", blurb: "A good clip is framed. A good video is sequenced.", quests: [
+      { id: "s1", kind: "main", xp: 20, title: "Turn on the grid",
+        brief: "Use the rule of thirds to place subjects off-center.",
+        steps: ["Enable gridlines in the camera settings.", "Put a person's eyes on the top third line.", "Film the horizon on the bottom line, then the top line. Notice what each says."] },
+      { id: "s2", kind: "main", xp: 40, title: "The five-shot sequence",
+        brief: "The fastest way to tell a story about any action: someone making coffee, tying shoes, painting.",
+        steps: ["Close-up of hands doing the action.", "Close-up of the face.", "Wide shot of the person and the space.", "Over-the-shoulder shot.", "One unusual angle: from the floor, from inside a cupboard, through a gap."],
+        tip: "<b>Edit it:</b> these five cut together in almost any order. Try it." },
+      { id: "s3", kind: "side", xp: 30, title: "Parallax slide",
+        brief: "Show depth by moving sideways past something close to the lens.",
+        steps: ["Find a foreground object: a plant, a railing, a door frame.", "Keep your subject in the background.", "Slide sideways slowly with Tilt Locked so the foreground moves faster than the background."] },
+      { id: "s4", kind: "side", xp: 30, title: "The reveal",
+        brief: "Start blocked, end on the payoff.",
+        steps: ["Start with the lens close to a wall, tree or doorway.", "Move out slowly to reveal your subject or view.", "Hold the final frame for 3 seconds."] },
+      { id: "s5", kind: "main", xp: 35, title: "Time-bend",
+        brief: "Try the three time modes: Timelapse, Hyperlapse and Motionlapse.",
+        steps: ["Timelapse: put the camera on a tripod and film clouds or traffic for 10 minutes.", "Hyperlapse: walk a street holding the camera, pick one point to keep framed.", "Motionlapse: set the start and end positions so the gimbal moves slowly during the timelapse."] }
+    ]},
+    { id: "sound", name: "Sound", blurb: "People forgive bad video. They don't forgive bad audio.", quests: [
+      { id: "a1", kind: "main", xp: 20, title: "Kill the wind",
+        brief: "The built-in mics are good, but wind ruins them.",
+        steps: ["Turn on wind noise reduction in audio settings.", "Record a sentence outside, facing into the wind, with it on and off.", "Listen on headphones."] },
+      { id: "a2", kind: "side", xp: 20, title: "Room tone",
+        brief: "Record 30 seconds of silence in every location. Editors will thank you.",
+        steps: ["Ask everyone to stay quiet.", "Record 30 seconds of the space with no talking.", "Use it later to fill gaps between cuts."] },
+      { id: "a3", kind: "side", xp: 30, title: "Wireless mic",
+        brief: "If you own a DJI Mic 2, the transmitter connects directly to the Pocket 3 with no receiver.",
+        steps: ["Pair the Mic 2 transmitter in the camera's audio settings.", "Clip it 15–20 cm below your chin.", "Record while walking away from the camera and listen to how clear it stays."] }
+    ]},
+    { id: "edit", name: "Edit & share", blurb: "Footage becomes a video in the edit.", quests: [
+      { id: "d1", kind: "main", xp: 25, title: "Get footage off",
+        brief: "Move clips to your phone or computer and back them up.",
+        steps: ["Transfer a few clips to your phone with DJI Mimo.", "Copy the whole card to a computer or drive.", "Try the auto-edit templates in DJI's LightCut app once, just to see."] },
+      { id: "d2", kind: "side", xp: 30, title: "Cut on action",
+        brief: "Cut in the middle of a movement so the edit disappears.",
+        steps: ["Film someone opening a door: one wide shot, one close shot of the handle.", "In the edit, cut from wide to close while the hand is moving.", "Watch it at full speed. The cut should feel invisible."] },
+      { id: "d3", kind: "side", xp: 35, title: "J-cut and L-cut",
+        brief: "Let sound cross the cut. It makes edits feel smooth and professional.",
+        steps: ["J-cut: start the next clip's audio a second before its picture.", "L-cut: let a clip's audio keep playing after the picture changes.", "Try both on a short conversation."] },
+      { id: "d4", kind: "side", xp: 40, title: "Grade D-Log M",
+        brief: "Flat footage, full control.",
+        steps: ["Film a colorful scene in 10-bit D-Log M.", "Apply DJI's official D-Log M to Rec.709 LUT in your editor.", "Adjust exposure and white balance before the LUT, then add your own look."] },
+      { id: "d5", kind: "main", xp: 100, title: "Final boss: 60-second film",
+        brief: "Tell one small story in 60 seconds using everything you've learned.",
+        steps: ["Pick a subject: a morning routine, a friend's hobby, a walk through your neighborhood.", "Use at least one establishing shot, one five-shot sequence, one gimbal move and one slow-mo or time-lapse.", "No clip longer than 6 seconds.", "Add music or natural sound, export, and share it."] }
+    ]}
+  ];
+
+  const RANKS = [
+    { at: 0, name: "Rookie" }, { at: 150, name: "Operator" }, { at: 350, name: "Shooter" },
+    { at: 650, name: "Cinematographer" }, { at: 950, name: "Director" }
+  ];
+
+  const DAILY = [
+    { t: "Knee-high world", d: "Film your neighborhood as a cat would see it.", r: "Every shot below knee height." },
+    { t: "One color", d: "Make a 30-second edit about a single color you find around you.", r: "Every clip must feature that color." },
+    { t: "Hands only", d: "Tell what someone is doing without ever showing their face.", r: "Only hands in frame." },
+    { t: "No cuts", d: "Plan and film one continuous 45-second shot that goes somewhere.", r: "A single take. Restart if you mess up." },
+    { t: "Reflections", d: "Find five reflections: puddles, windows, spoons, car paint, sunglasses.", r: "Five clips, each at least 4 seconds." },
+    { t: "Shadow play", d: "Film shadows instead of the things that cast them.", r: "The object itself never appears." },
+    { t: "Ten-second story", d: "A beginning, middle and end in ten seconds.", r: "Three clips, total 10 seconds." },
+    { t: "Doorways", d: "Use door frames, windows and arches to frame your subject.", r: "Every shot has a frame inside the frame." },
+    { t: "Vertical only", d: "Rotate the screen and shoot a vertical clip for social.", r: "Fill the 9:16 frame top to bottom." },
+    { t: "Sound first", d: "Find a sound you love, then film the picture that goes with it.", r: "Close your eyes and listen before you hit Record." },
+    { t: "Slow world", d: "Film three everyday moments in 120fps slow motion.", r: "Nothing that is normally exciting." },
+    { t: "Follow the leader", d: "Use ActiveTrack to follow a person, pet or bike for one minute.", r: "Keep them in frame the whole time." },
+    { t: "Foreground", d: "Something must sit close to the lens in every shot.", r: "Leaves, a cup rim, a fence, anything." },
+    { t: "Opposites", d: "Film pairs: big and small, fast and slow, loud and quiet.", r: "Three pairs, cut back to back." },
+    { t: "Blue hour", d: "Film the 20 minutes right after sunset.", r: "Lock white balance so the blue stays blue." },
+    { t: "The commute", d: "Turn your ordinary route into a hyperlapse.", r: "Pick one landmark to keep framed." },
+    { t: "Portrait of a thing", d: "Make an object look important: a mug, a bike, a plant.", r: "Use a push-in and an orbit." },
+    { t: "Silent film", d: "Tell a short story with no dialogue at all.", r: "Viewers should understand it on mute." },
+    { t: "Match cut", d: "Find two different things with the same shape or motion and cut between them.", r: "A wheel to a clock, a door to a door." },
+    { t: "Texture hunt", d: "Film eight textures in extreme close-up.", r: "Get as close as the lens will focus." }
+  ];
+
+  const KEY = "pocket3-quest-v1";
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+  let state = Object.assign({ done: {}, notes: {}, daily: {}, open: {} }, load());
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const allQuests = CHAPTERS.flatMap((c) => c.quests);
+  let filter = "all";
+
+  function totalXP() {
+    let xp = 0;
+    allQuests.forEach((q) => { if (state.done[q.id]) xp += q.xp; });
+    xp += Object.keys(state.daily).length * 25;
+    return xp;
+  }
+
+  function renderHeader() {
+    const xp = totalXP();
+    let i = RANKS.length - 1;
+    while (i > 0 && xp < RANKS[i].at) i--;
+    const cur = RANKS[i], next = RANKS[i + 1];
+    $("rankName").textContent = cur.name;
+    $("xpText").textContent = xp + " XP";
+    $("rankFrom").textContent = cur.at;
+    $("rankNext").textContent = next ? "Next: " + next.name + " at " + next.at + " XP" : "Top rank reached";
+    $("xpBar").style.width = (next ? ((xp - cur.at) / (next.at - cur.at)) * 100 : 100) + "%";
+    const n = allQuests.filter((q) => state.done[q.id]).length;
+    $("count").textContent = n + " / " + allQuests.length + " quests";
+    // timecode reads XP as hh:mm:ss:ff, a nod to the camera OSD
+    const pad = (v) => String(v).padStart(2, "0");
+    $("tc").textContent = [Math.floor(xp / 3600), Math.floor(xp / 60) % 60, xp % 60, n].map(pad).join(":");
+  }
+
+  function visible(q) {
+    if (filter === "open") return !state.done[q.id];
+    if (filter === "main" || filter === "side") return q.kind === filter;
+    return true;
+  }
+
+  function renderQuests() {
+    const html = CHAPTERS.map((c) => {
+      const qs = c.quests.filter(visible);
+      if (!qs.length) return "";
+      const got = c.quests.filter((q) => state.done[q.id]).length;
+      return `<div class="chapter">
+        <div class="chapter-head"><h2>${esc(c.name)}</h2><small>${got}/${c.quests.length}</small></div>
+        <p>${esc(c.blurb)}</p>
+        <div class="quests">${qs.map(questHTML).join("")}</div>
+      </div>`;
+    }).join("");
+    $("chapters").innerHTML = html || `<p style="color:var(--muted)">Nothing here. Every quest in this filter is done.</p>`;
+  }
+
+  function questHTML(q) {
+    const done = !!state.done[q.id], open = !!state.open[q.id];
+    return `<article class="quest${done ? " done" : ""}${open ? " open" : ""}" data-id="${q.id}">
+      <button class="q-head" data-act="toggle" aria-expanded="${open}">
+        <span class="check" aria-hidden="true">✓</span>
+        <span class="q-title"><b>${esc(q.title)}</b>
+          <span class="q-meta"><span class="tag ${q.kind}">${q.kind === "main" ? "Main" : "Side"}</span>${esc(q.brief)}</span></span>
+        <span class="xp">+${q.xp}</span>
+        <svg class="chev" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5 2l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
+      ${open ? `<div class="q-body">
+        <div class="label">The quest</div>
+        <ol>${q.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+        ${q.tip ? `<p class="tip">${q.tip}</p>` : ""}
+        <label class="label" for="note-${q.id}">Field notes</label>
+        <textarea id="note-${q.id}" data-note="${q.id}" placeholder="What worked? What would you change?">${esc(state.notes[q.id] || "")}</textarea>
+        <button class="btn complete" data-act="done">${done ? "Completed · undo" : "Mark complete · +" + q.xp + " XP"}</button>
+      </div>` : ""}
+    </article>`;
+  }
+
+  $("chapters").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const id = btn.closest(".quest").dataset.id;
+    if (btn.dataset.act === "toggle") state.open[id] = !state.open[id];
+    else state.done[id] = !state.done[id];
+    save(); renderQuests(); renderHeader();
+  });
+  $("chapters").addEventListener("input", (e) => {
+    const id = e.target.dataset.note;
+    if (id) { state.notes[id] = e.target.value; save(); }
+  });
+  $("filters").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-f]");
+    if (!b) return;
+    filter = b.dataset.f;
+    document.querySelectorAll("#filters .chip").forEach((c) => c.setAttribute("aria-pressed", c === b));
+    renderQuests();
+  });
+
+  // Today's side quest: seeded by date so it's stable for the day; rerolls shift the seed.
+  const today = new Date().toISOString().slice(0, 10);
+  let roll = 0;
+  function dailyIndex() {
+    let h = 0;
+    for (const ch of today) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return (h + roll) % DAILY.length;
+  }
+  function renderDaily() {
+    const q = DAILY[dailyIndex()];
+    $("dailyDate").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+    $("dailyTitle").textContent = q.t;
+    $("dailyText").textContent = q.d;
+    $("dailyRule").textContent = "Rule: " + q.r;
+    const done = !!state.daily[today];
+    $("dailyDone").textContent = done ? "Done for today · undo" : "Mark done · +25 XP";
+    const n = Object.keys(state.daily).length;
+    $("dailyStreak").textContent = n ? n + " daily quest" + (n === 1 ? "" : "s") + " completed so far" : "Complete one a day for 25 XP each.";
+  }
+  $("dailyDone").addEventListener("click", () => {
+    if (state.daily[today]) delete state.daily[today]; else state.daily[today] = DAILY[dailyIndex()].t;
+    save(); renderDaily(); renderHeader();
+  });
+  $("dailyReroll").addEventListener("click", () => { roll++; renderDaily(); });
+
+  // tabs
+  document.querySelectorAll("[data-tab]").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === t));
+    ["quests", "daily", "sheet"].forEach((p) => { $("panel-" + p).hidden = p !== t.dataset.tab; });
+    try { localStorage.setItem(KEY + "-tab", t.dataset.tab); } catch (e) {}
+  }));
+  try { const t = localStorage.getItem(KEY + "-tab"); if (t) document.querySelector(`[data-tab="${t}"]`)?.click(); } catch (e) {}
+
+  // shutter calc
+  const calc = () => { $("shutter").textContent = "1/" + Math.round(($("fps").value * 2) / 10) * 10; };
+  $("fps").addEventListener("change", calc);
+
+  // reset with in-page confirm (no dialogs)
+  let armed = false;
+  $("reset").addEventListener("click", () => {
+    if (!armed) { armed = true; $("reset").textContent = "Tap again to erase"; $("resetMsg").textContent = ""; return; }
+    armed = false; state = { done: {}, notes: {}, daily: {}, open: {} }; save();
+    $("reset").textContent = "Reset all progress"; $("resetMsg").textContent = "Progress cleared";
+    renderQuests(); renderDaily(); renderHeader();
+  });
+
+  // open the first quest so the page shows what a quest looks like
+  if (!Object.keys(state.open).length && !Object.keys(state.done).length) state.open.b1 = true;
+  calc(); renderQuests(); renderDaily(); renderHeader();
+})();
+</script>
