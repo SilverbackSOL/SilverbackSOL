@@ -4,16 +4,22 @@
       <stop offset="0" stop-color="#2a74a8"/>
       <stop offset="1" stop-color="#153f5f"/>
     </linearGradient>
+    <pattern id="stripes" patternUnits="userSpaceOnUse" width="48" height="48" patternTransform="skewX(-35)">
+      <rect width="24" height="48" fill="#17202b"/>
+    </pattern>
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
-  <g transform="translate(0,-15)">
-    <rect x="196" y="232" width="120" height="220" rx="40" fill="#eef1f4"/>
-    <rect x="214" y="262" width="84" height="112" rx="12" fill="#1f5e8c"/>
-    <circle cx="256" cy="412" r="15" fill="#d6332b"/>
-    <rect x="236" y="204" width="40" height="40" fill="#c4cfda"/>
-    <rect x="176" y="90" width="160" height="124" rx="44" fill="#eef1f4"/>
-    <circle cx="256" cy="152" r="47" fill="#17202b"/>
-    <circle cx="256" cy="152" r="30" fill="#24496a"/>
-    <circle cx="243" cy="139" r="9" fill="#ffffff" fill-opacity=".6"/>
+  <g transform="translate(0,15)">
+    <rect x="136" y="226" width="240" height="170" rx="16" fill="#17202b"/>
+    <line x1="160" y1="290" x2="352" y2="290" stroke="#eef1f4" stroke-opacity=".45" stroke-width="5"/>
+    <line x1="160" y1="336" x2="300" y2="336" stroke="#eef1f4" stroke-opacity=".45" stroke-width="5"/>
+    <circle cx="344" cy="356" r="14" fill="#d6332b"/>
+    <rect x="136" y="196" width="240" height="40" fill="#eef1f4"/>
+    <rect x="136" y="196" width="240" height="40" fill="url(#stripes)"/>
+    <g transform="rotate(-18 140 190)">
+      <rect x="136" y="150" width="240" height="40" fill="#eef1f4"/>
+      <rect x="136" y="150" width="240" height="40" fill="url(#stripes)"/>
+    </g>
+    <circle cx="146" cy="192" r="9" fill="#c4cfda"/>
   </g>
 </svg>

@@ -1,6 +1,6 @@
-// Pocket 3 Quest Log service worker: makes the app open with no signal.
+// Pocket 3 Film School service worker: makes the app open with no signal.
 // Bump VERSION whenever app files change so phones pick up the new copy.
-const VERSION = "pocket3-v2";
+const VERSION = "pocket3-v3";
 const APP_FILES = [
   "./",
   "index.html",
