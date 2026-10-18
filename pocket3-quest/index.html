@@ -4,12 +4,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1f5e8c">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Pocket 3">
+<meta name="apple-mobile-web-app-title" content="Film School">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Pocket 3 Quest Log</title>
+<title>Pocket 3 Film School</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -183,7 +183,7 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
       <span class="rec"><i></i>REC · <span id="tc">00:00:00:00</span></span>
       <span class="rec" id="count">0 / 0 quests</span>
     </div>
-    <h1>Pocket 3 Quest Log</h1>
+    <h1>Pocket 3 Film School</h1>
     <p>Learn the DJI Osmo Pocket 3 one shot at a time. Main quests teach the camera. Side quests teach you to film like you mean it.</p>
     <div class="rank"><b id="rankName">Rookie</b><span id="xpText">0 XP</span></div>
     <div class="bar" aria-hidden="true"><div id="xpBar"></div></div>
@@ -268,6 +268,7 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
           <tr><td>Evening streets</td><td>Night</td><td>Keep the camera steady, find practical lights (signs, lamps)</td></tr>
           <tr><td>Clouds, crowds, sunsets</td><td>Timelapse</td><td>Mini tripod, interval 2–5 s, at least 10 min of shooting</td></tr>
           <tr><td>Walking through a place</td><td>Hyperlapse</td><td>Walk smoothly, pick one fixed point to keep framed</td></tr>
+          <tr><td>Vlog in a tight space</td><td>Video + wide-angle lens</td><td>Lens setting on, Follow, face centered, camera at eye level</td></tr>
           <tr><td>Color grading later</td><td>Video (Pro)</td><td>10-bit D-Log M, expose a touch bright, apply DJI's LUT in edit</td></tr>
         </table></div>
       </div>
@@ -377,6 +378,28 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
       { id: "s5", kind: "main", xp: 35, title: "Time-bend",
         brief: "Try the three time modes: Timelapse, Hyperlapse and Motionlapse.",
         steps: ["Timelapse: put the camera on a tripod and film clouds or traffic for 10 minutes.", "Hyperlapse: walk a street holding the camera, pick one point to keep framed.", "Motionlapse: set the start and end positions so the gimbal moves slowly during the timelapse."] }
+    ]},
+    { id: "wide", name: "Wide-angle lens", blurb: "The magnetic wide-angle lens (in the Creator Combo, or sold separately) fits more of the world in frame. Learn when that helps and when it hurts.", quests: [
+      { id: "w1", kind: "main", xp: 20, title: "Snap it on",
+        brief: "Attach the lens and tell the camera it's there.",
+        steps: ["Wipe the camera lens and the wide-angle lens with a microfiber cloth.", "Line up the wide-angle lens and let the magnet snap it onto the front of the camera head.", "Look in the camera settings for the wide-angle lens option and turn it on. The exact wording can change with firmware.", "Check the corners of the frame for dark edges. If you see them, reseat the lens."],
+        tip: "<b>Habit:</b> take the lens off before putting the camera in its case, and turn the setting off when you do." },
+      { id: "w2", kind: "main", xp: 25, title: "Same spot, two lenses",
+        brief: "See exactly what the wide-angle lens adds.",
+        steps: ["Stand in one spot and film a 5-second clip without the lens.", "Attach the lens and film the same scene from the same spot.", "Watch them back to back. Note what the wide version shows, and whether it feels more open or more empty."] },
+      { id: "w3", kind: "side", xp: 30, title: "Arm's-length vlog",
+        brief: "Wide lenses make selfie vlogs show the place, not just your face.",
+        steps: ["Flip to selfie mode and hold the camera at arm's length, at eye level or slightly above.", "Talk to camera for 30 seconds while walking somewhere interesting.", "Keep your face near the middle of the frame. Faces near the edges look stretched on a wide lens."] },
+      { id: "w4", kind: "side", xp: 30, title: "Tight spaces",
+        brief: "Show a whole small space in one shot.",
+        steps: ["Pick a cramped place: a car interior, a small kitchen, a stairwell.", "Film it without the lens, then with it.", "Use the wide version as an establishing shot that shows the whole room."] },
+      { id: "w5", kind: "side", xp: 35, title: "Close and wide",
+        brief: "Get close with a wide lens and perspective gets dramatic.",
+        steps: ["Hold the camera a hand's width from something in the foreground: a skateboard wheel, a coffee cup, a hand reaching toward the lens.", "Have the subject move toward the lens or past it.", "Notice how movement near a wide lens feels faster and bigger than it is."],
+        tip: "<b>Use it for energy:</b> this look suits action and comedy. It rarely suits calm, flattering portraits." },
+      { id: "w6", kind: "side", xp: 30, title: "Keep it straight",
+        brief: "Wide lenses bend straight lines, especially near the edges of the frame.",
+        steps: ["Film a building or doorway with the camera level and the lines near the middle of the frame.", "Now tilt the camera up at the building and film it again.", "Compare them. Keep the camera level when straight lines matter."] }
     ]},
     { id: "sound", name: "Sound", blurb: "People forgive bad video. They don't forgive bad audio.", quests: [
       { id: "a1", kind: "main", xp: 20, title: "Kill the wind",
@@ -580,5 +603,10 @@ select { font: inherit; color: var(--ink); background: var(--bg); border: 1px so
   // open the first quest so the page shows what a quest looks like
   if (!Object.keys(state.open).length && !Object.keys(state.done).length) state.open.b1 = true;
   calc(); renderQuests(); renderDaily(); renderHeader();
+
+  // offline support: cache the app after the first visit (skipped where service workers aren't allowed)
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 })();
 </script>
