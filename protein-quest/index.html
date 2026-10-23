@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f3640">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Protein Quest">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Protein Quest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: rank + XP header, tabbed body. Today is a progress ring over a column of meal-slot cards;
+   logging a swap or extra opens one bottom sheet that handles favourites, AI/database lookup and manual grams. */
+:root {
+  --bg: #f1f2f4;
+  --surface: #ffffff;
+  --ink: #1c2027;
+  --muted: #5f6774;
+  --line: #d6d9df;
+  --accent: #2f3640;      /* silverback graphite */
+  --accent-soft: #e3e6ea;
+  --gold: #a86f00;        /* XP and rank, banana gold */
+  --gold-soft: #f8ecd0;
+  --done: #2d7a4b;
+  --done-soft: #dcefe3;
+  --warn: #a4471d;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121418; --surface: #1b1e24; --ink: #e8eaee; --muted: #9aa2ae; --line: #2e333b;
+    --accent: #c9ced6; --accent-soft: #2a2f37; --gold: #f2b84b; --gold-soft: #3a2f17;
+    --done: #5cc285; --done-soft: #183526; --warn: #f08a5d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121418; --surface: #1b1e24; --ink: #e8eaee; --muted: #9aa2ae; --line: #2e333b;
+  --accent: #c9ced6; --accent-soft: #2a2f37; --gold: #f2b84b; --gold-soft: #3a2f17;
+  --done: #5cc285; --done-soft: #183526; --warn: #f08a5d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+/* standalone (home-screen) mode: keep content clear of the notch and home bar */
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 56px;
+}
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+input, textarea {
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0;
+}
+textarea { min-height: 64px; resize: vertical; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.btn {
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 8px;
+  padding: 8px 14px; font-weight: 600; font-size: 14px;
+}
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.msg { font-size: 13.5px; color: var(--muted); min-height: 1em; margin: 0; }
+.msg.err { color: var(--warn); }
+
+/* header */
+.hero { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: grid; gap: 10px; }
+.hero-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.hero h1 { font-size: 30px; font-weight: 700; line-height: 1.05; }
+.stats { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+.rank { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.rank b { font-family: var(--display); font-size: 21px; font-weight: 600; }
+.rank span { font-family: var(--mono); font-size: 13px; color: var(--gold); font-weight: 600; }
+.bar { height: 8px; border-radius: 6px; background: var(--gold-soft); overflow: hidden; }
+.bar > div { height: 100%; background: var(--gold); width: 0; transition: width .5s ease; }
+.hero small { font-size: 12.5px; color: var(--muted); }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; margin: 16px 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button {
+  background: none; border: 0; padding: 10px 12px; font-family: var(--display); font-size: 18px; font-weight: 600;
+  color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--gold); }
+
+/* today */
+.today { display: grid; gap: 14px; }
+.ringcard { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; grid-template-columns: 132px 1fr; gap: 16px; align-items: center; }
+.ring { position: relative; width: 132px; height: 132px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .track { stroke: var(--accent-soft); }
+.ring .fill { stroke: var(--gold); transition: stroke-dashoffset .6s ease; }
+.ring.hit .fill { stroke: var(--done); }
+.ring-label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring-label b { font-family: var(--display); font-size: 34px; line-height: 1; }
+.ring-label span { font-size: 12px; color: var(--muted); }
+.ringcard h2 { font-size: 22px; }
+.ringcard p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.dayxp { margin-top: 8px; font-family: var(--mono); font-size: 13px; color: var(--gold); font-weight: 600; }
+@media (max-width: 420px) { .ringcard { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+
+.slots { display: grid; gap: 8px; }
+.slot { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.slot.ate { border-color: color-mix(in srgb, var(--done) 50%, var(--line)); background: color-mix(in srgb, var(--done-soft) 45%, var(--surface)); }
+.slot-name { display: grid; gap: 1px; min-width: 0; }
+.slot-name .label { color: var(--muted); }
+.slot-name b { font-weight: 600; overflow-wrap: anywhere; }
+.slot-name small { font-size: 13px; color: var(--muted); }
+.slot-actions { display: flex; gap: 6px; }
+.ate-btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: 14px; white-space: nowrap; }
+.swap-btn { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.undo-btn { border: 0; background: none; color: var(--muted); font-size: 13px; text-decoration: underline; padding: 4px; }
+.tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 4px; background: var(--accent-soft); color: var(--muted); white-space: nowrap; }
+.tag.xp { background: var(--gold-soft); color: var(--gold); }
+.tag.ok { background: var(--done-soft); color: var(--done); }
+.extras { display: grid; gap: 6px; }
+.extra { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 14px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.extra span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+/* sheet */
+dialog.sheet {
+  border: 0; padding: 0; width: min(560px, 100%); max-width: 100%; max-height: 92dvh; margin: auto auto 0; border-radius: 16px 16px 0 0;
+  background: var(--surface); color: var(--ink);
+}
+@media (min-width: 600px) { dialog.sheet { margin: auto; border-radius: 16px; } }
+dialog.sheet::backdrop { background: rgb(0 0 0 / .45); }
+.sheet-in { padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+.sheet-head h2 { font-size: 24px; }
+.sheet-head p { margin: 2px 0 0; color: var(--muted); font-size: 13.5px; }
+.close { border: 0; background: none; font-size: 22px; line-height: 1; color: var(--muted); padding: 2px 6px; }
+.favs { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 5px 11px; font-size: 13px; }
+.chip .num { color: var(--muted); font-size: 12px; }
+.items { display: grid; gap: 6px; }
+.item { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; grid-template-columns: 1fr 78px auto; gap: 8px; align-items: center; }
+.item-name { min-width: 0; display: grid; gap: 2px; }
+.item-name b { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.item-name small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.item input { padding: 6px 8px; text-align: right; font-family: var(--mono); }
+.item .rm { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 2px 4px; }
+.src-usda { background: var(--done-soft); color: var(--done); }
+.src-off { background: var(--accent-soft); color: var(--ink); }
+.src-ai { background: var(--gold-soft); color: var(--gold); }
+.totals { display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: end; }
+.totals label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.totals input { font-family: var(--mono); text-align: right; font-size: 18px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.check input { width: auto; }
+
+/* plan & settings */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.card + .card { margin-top: 12px; }
+.card h3 { font-size: 22px; }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.plan-row { display: grid; grid-template-columns: 1fr 1.4fr 74px auto; gap: 6px; align-items: center; }
+.plan-row input:last-of-type { font-family: var(--mono); text-align: right; }
+.plan-row .rm { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 2px 4px; }
+@media (max-width: 480px) {
+  .plan-row { grid-template-columns: 1fr 74px auto; }
+  .plan-row input:nth-of-type(2) { grid-column: 1 / -1; grid-row: 2; }
+}
+.plan-sum { font-family: var(--mono); font-size: 13px; }
+
+/* progress */
+.ladder { display: grid; gap: 6px; }
+.ladder div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.ladder .cur { font-weight: 600; color: var(--gold); }
+.ladder .locked { color: var(--muted); }
+.heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; max-width: 320px; }
+.heat div { aspect-ratio: 1; border-radius: 4px; background: var(--accent-soft); }
+.heat .l1 { background: color-mix(in srgb, var(--done) 30%, var(--accent-soft)); }
+.heat .l2 { background: color-mix(in srgb, var(--done) 65%, var(--accent-soft)); }
+.heat .l3 { background: var(--done); }
+.heat .frz { background: var(--gold-soft); outline: 1px solid var(--gold); }
+.heat .now { outline: 2px solid var(--ink); outline-offset: -2px; }
+.heat .pad { background: transparent; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+.rules { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.flist { display: grid; gap: 4px; }
+.flist div { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); padding: 4px 0; font-size: 14px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px);
+  background: var(--ink); color: var(--bg); border-radius: 999px; padding: 8px 16px; font-weight: 600; font-size: 14px;
+  opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) { .toast, .bar > div, .ring .fill { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-top">
+      <h1>Protein Quest</h1>
+      <div class="stats">
+        <span>Streak <b id="streak">0</b></span>
+        <span>Freezes <b id="freezes">0</b></span>
+      </div>
+    </div>
+    <div class="rank"><b id="rankName">Juvenile</b><span id="xpText">0 XP</span></div>
+    <div class="bar" role="progressbar" aria-label="Progress to next rank"><div id="xpBar"></div></div>
+    <small id="rankNext"></small>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="plan" aria-selected="false">Plan</button>
+    <button role="tab" data-tab="progress" aria-selected="false">Progress</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
+  </nav>
+
+  <section id="panel-today" class="today">
+    <div class="ringcard">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="track" cx="60" cy="60" r="52" fill="none" stroke-width="12"/>
+          <circle class="fill" id="ringFill" cx="60" cy="60" r="52" fill="none" stroke-width="12" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-label"><b id="ringNum" class="num">0</b><span id="ringOf">of 0 g</span></div>
+      </div>
+      <div>
+        <h2 id="dayTitle">Today</h2>
+        <p id="nudge"></p>
+        <div class="dayxp" id="dayXP"></div>
+      </div>
+    </div>
+    <div class="slots" id="slots"></div>
+    <div class="card">
+      <div class="row" style="justify-content: space-between">
+        <h3>Extras</h3>
+        <button class="btn ghost" id="addExtra">+ Add food</button>
+      </div>
+      <div class="extras" id="extras"></div>
+    </div>
+  </section>
+
+  <section id="panel-plan" hidden>
+    <div class="card">
+      <h3>Daily target</h3>
+      <label class="field">Protein target (g)
+        <input id="target" type="number" inputmode="numeric" min="20" max="500" style="max-width: 140px">
+      </label>
+      <p>A day keeps your streak alive at 90% of this. Hitting 100% earns the daily bonus.</p>
+    </div>
+    <div class="card">
+      <h3>Meal slots</h3>
+      <p>One row per meal on your plan: slot name, the food, and its protein in grams.</p>
+      <div id="planRows" style="display: grid; gap: 8px"></div>
+      <div class="row" style="justify-content: space-between">
+        <button class="btn ghost" id="addSlot">+ Add slot</button>
+        <span class="plan-sum" id="planSum"></span>
+      </div>
+      <p class="msg" id="planMsg"></p>
+    </div>
+  </section>
+
+  <section id="panel-progress" hidden>
+    <div class="card">
+      <h3>Last 4 weeks</h3>
+      <div class="heat" id="heat"></div>
+      <div class="legend">
+        <span><i style="background: var(--accent-soft)"></i>Under 90%</span>
+        <span><i style="background: color-mix(in srgb, var(--done) 65%, var(--accent-soft))"></i>Streak day</span>
+        <span><i style="background: var(--done)"></i>Clean sweep</span>
+        <span><i style="background: var(--gold-soft); outline: 1px solid var(--gold)"></i>Freeze used</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Rank ladder</h3>
+      <div class="ladder" id="ladder"></div>
+    </div>
+    <div class="card">
+      <h3>How XP works</h3>
+      <ul class="rules">
+        <li>Planned meal eaten: <b>+10 XP</b></li>
+        <li>Swap within 10% of the planned protein: <b>+6 XP</b></li>
+        <li>Daily target hit: <b>+25 XP</b>. Going past it earns nothing extra.</li>
+        <li>Every slot eaten as planned: <b>+15 XP</b> Clean Sweep</li>
+        <li>Streak: days at 90% or more of target. Every 7 streak days earns a Banana Freeze (hold up to 3) that covers one missed day.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="panel-settings" hidden>
+    <div class="card">
+      <h3>Food lookup</h3>
+      <p>The lookup runs on your Cloudflare Worker, which holds the API keys. Paste its URL and the APP_TOKEN you set on it.</p>
+      <label class="field">Worker URL
+        <input id="workerUrl" type="url" placeholder="https://protein-quest-lookup.you.workers.dev" autocomplete="off">
+      </label>
+      <label class="field">App token
+        <input id="workerToken" type="password" autocomplete="off">
+      </label>
+      <div class="row"><button class="btn" id="testWorker">Save and test</button></div>
+      <p class="msg" id="workerMsg"></p>
+    </div>
+    <div class="card">
+      <h3>Saved foods</h3>
+      <div class="flist" id="favList"></div>
+    </div>
+    <div class="card">
+      <h3>Backup</h3>
+      <p>Everything is stored on this device only. Export a copy now and then.</p>
+      <div class="row">
+        <button class="btn ghost" id="exportData">Export</button>
+        <label class="btn ghost" style="cursor: pointer">Import<input type="file" id="importData" accept="application/json" hidden></label>
+        <button class="btn ghost" id="reset">Reset everything</button>
+      </div>
+      <p class="msg" id="dataMsg"></p>
+    </div>
+  </section>
+</div>
+
+<dialog class="sheet" id="sheet">
+  <form method="dialog" class="sheet-in" id="sheetForm">
+    <div class="sheet-head">
+      <div><h2 id="sheetTitle">Add food</h2><p id="sheetSub"></p></div>
+      <button type="button" class="close" id="closeSheet" aria-label="Close">×</button>
+    </div>
+    <div class="favs" id="sheetFavs"></div>
+    <label class="field">What did you eat?
+      <textarea id="desc" placeholder="8 oz grilled chicken, 1 cup white rice, 2 eggs"></textarea>
+    </label>
+    <div class="row">
+      <button type="button" class="btn" id="estimate">Estimate macros</button>
+      <span class="msg" id="estMsg"></span>
+    </div>
+    <div class="items" id="items"></div>
+    <div class="totals">
+      <span class="msg" id="macroLine"></span>
+      <label>Protein (g)<input id="protein" type="number" inputmode="decimal" min="0" step="0.1"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="saveFav"> Save as a favourite</label>
+    <p class="msg" id="swapHint"></p>
+    <button type="submit" class="btn" value="log" id="logBtn">Log it</button>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  const RANKS = [
+    { name: "Juvenile", at: 0 },
+    { name: "Blackback", at: 250 },
+    { name: "Troop Leader", at: 800 },
+    { name: "Silverback", at: 2000 },
+    { name: "King of the Jungle", at: 5000 }
+  ];
+  const XP = { planned: 10, swap: 6, target: 25, sweep: 15 };
+  const STREAK_PCT = 0.9, SWAP_TOL = 0.1, FREEZE_EVERY = 7, FREEZE_MAX = 3;
+  const SOURCE = { usda: "USDA", off: "Open Food Facts", ai: "AI estimate", saved: "Saved" };
+
+  const DEFAULT_SLOTS = [
+    { id: "s1", name: "Breakfast", food: "Eggs and Greek yogurt", protein: 40 },
+    { id: "s2", name: "Lunch", food: "Chicken and rice", protein: 50 },
+    { id: "s3", name: "Shake", food: "Whey protein shake", protein: 30 },
+    { id: "s4", name: "Dinner", food: "Lean beef or fish with veg", protein: 50 },
+    { id: "s5", name: "Snack", food: "Cottage cheese", protein: 10 }
+  ];
+
+  const KEY = "protein-quest-v1";
+  const blank = () => ({ target: 180, slots: DEFAULT_SLOTS.map((s) => ({ ...s })), days: {}, favorites: [], settings: { url: "", token: "" } });
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+  let state = Object.assign(blank(), load());
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  // dates are local calendar days, keyed YYYY-MM-DD; noon avoids DST edge cases when stepping
+  const keyOf = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const dateOf = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d, 12); };
+  const addDays = (k, n) => { const d = dateOf(k); d.setDate(d.getDate() + n); return keyOf(d); };
+  const todayKey = () => keyOf(new Date());
+
+  // each day snapshots the target and slot list so editing the plan later doesn't rewrite history
+  function day(k, create) {
+    if (!state.days[k] && create) state.days[k] = { target: state.target, slots: state.slots.map((s) => s.id), entries: [] };
+    return state.days[k] || { target: state.target, slots: state.slots.map((s) => s.id), entries: [] };
+  }
+  const total = (d) => d.entries.reduce((t, e) => t + (Number(e.protein) || 0), 0);
+
+  function entryXP(e) {
+    if (e.kind === "planned") return XP.planned;
+    if (e.kind === "swap" && e.planned > 0 && Math.abs(e.protein - e.planned) <= e.planned * SWAP_TOL) return XP.swap;
+    return 0;
+  }
+  function sweep(d) { return d.slots.length > 0 && d.slots.every((id) => d.entries.some((e) => e.slot === id && e.kind === "planned")); }
+  function dayXP(d) {
+    let xp = d.entries.reduce((t, e) => t + entryXP(e), 0);
+    if (total(d) >= d.target) xp += XP.target;
+    if (sweep(d)) xp += XP.sweep;
+    return xp;
+  }
+  const totalXP = () => Object.values(state.days).reduce((t, d) => t + dayXP(d), 0);
+
+  // Walk every day from the first log to today. Today only counts once it's hit, so an unfinished
+  // day never breaks the streak early. Returns per-day status for the heatmap too.
+  function streakInfo() {
+    const keys = Object.keys(state.days).filter((k) => state.days[k].entries.length).sort();
+    const status = {};
+    let streak = 0, freezes = 0;
+    if (!keys.length) return { streak, freezes, status };
+    const today = todayKey();
+    for (let k = keys[0]; k <= today; k = addDays(k, 1)) {
+      const d = state.days[k];
+      const hit = d && d.target > 0 && total(d) >= d.target * STREAK_PCT;
+      if (hit) {
+        streak++;
+        if (streak % FREEZE_EVERY === 0) freezes = Math.min(FREEZE_MAX, freezes + 1);
+        status[k] = sweep(d) ? "l3" : "l2";
+      } else if (k === today) {
+        status[k] = d && total(d) > 0 ? "l1" : "";
+      } else if (freezes > 0) {
+        freezes--; status[k] = "frz";
+      } else {
+        streak = 0; status[k] = d && total(d) > 0 ? "l1" : "";
+      }
+    }
+    return { streak, freezes, status };
+  }
+
+  function rankFor(xp) {
+    let i = RANKS.length - 1;
+    while (i > 0 && xp < RANKS[i].at) i--;
+    return i;
+  }
+
+  function renderHeader() {
+    const xp = totalXP(), i = rankFor(xp), cur = RANKS[i], next = RANKS[i + 1];
+    $("rankName").textContent = cur.name;
+    $("xpText").textContent = xp + " XP";
+    $("rankNext").textContent = next ? (next.at - xp) + " XP to " + next.name : "Top rank reached";
+    $("xpBar").style.width = (next ? ((xp - cur.at) / (next.at - cur.at)) * 100 : 100) + "%";
+    const s = streakInfo();
+    $("streak").textContent = s.streak;
+    $("freezes").textContent = s.freezes;
+  }
+
+  function renderToday() {
+    const d = day(todayKey());
+    const got = total(d), pct = d.target ? got / d.target : 0;
+    const C = 2 * Math.PI * 52;
+    $("ringFill").style.strokeDasharray = C;
+    $("ringFill").style.strokeDashoffset = C * (1 - Math.min(pct, 1));
+    $("ring").classList.toggle("hit", pct >= 1);
+    $("ringNum").textContent = Math.round(got);
+    $("ringOf").textContent = "of " + d.target + " g";
+    $("dayTitle").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+
+    const left = d.target - got;
+    const open = state.slots.filter((s) => !d.entries.some((e) => e.slot === s.id));
+    let nudge;
+    if (pct >= 1.1) nudge = "Past your target. Extra protein doesn't earn XP, so no need to push further.";
+    else if (pct >= 1) nudge = "Target hit. Nice work.";
+    else if (!open.length) nudge = Math.round(left) + " g short with every slot logged. Add an extra to close the gap.";
+    else {
+      const covers = open.find((s) => s.protein >= left);
+      nudge = covers ? Math.round(left) + " g to go. Your planned " + covers.name.toLowerCase() + " covers it."
+        : Math.round(left) + " g to go. Next up: " + open[0].name + " (" + open[0].protein + " g).";
+    }
+    $("nudge").textContent = nudge;
+    const xp = dayXP(d);
+    $("dayXP").textContent = xp ? "+" + xp + " XP today" + (sweep(d) ? " · Clean Sweep" : "") : "";
+
+    $("slots").innerHTML = state.slots.map((s) => {
+      const e = d.entries.find((x) => x.slot === s.id);
+      if (e) {
+        const gain = entryXP(e);
+        const what = e.kind === "planned" ? esc(s.food) : "Swapped: " + esc(e.name);
+        return `<div class="slot ate"><div class="slot-name"><span class="label">${esc(s.name)}</span><b>${what}</b>
+          <small class="num">${r1(e.protein)} g protein ${gain ? `<span class="tag xp">+${gain} XP</span>` : e.kind === "swap" ? `<span class="tag">off plan</span>` : ""}</small></div>
+          <div class="slot-actions"><button class="undo-btn" data-undo="${e.id}">Undo</button></div></div>`;
+      }
+      return `<div class="slot"><div class="slot-name"><span class="label">${esc(s.name)}</span><b>${esc(s.food)}</b><small class="num">${s.protein} g protein</small></div>
+        <div class="slot-actions"><button class="swap-btn" data-swap="${s.id}">Swap</button><button class="ate-btn" data-ate="${s.id}">Ate it</button></div></div>`;
+    }).join("");
+
+    const extras = d.entries.filter((e) => e.kind === "extra");
+    $("extras").innerHTML = extras.length ? extras.map((e) =>
+      `<div class="extra"><span>${esc(e.name)}</span><span class="row"><span class="num">${r1(e.protein)} g</span><button class="undo-btn" data-undo="${e.id}">Remove</button></span></div>`
+    ).join("") : `<p class="msg">Anything off the plan goes here. It counts toward your grams.</p>`;
+  }
+
+  function renderPlan() {
+    $("target").value = state.target;
+    $("planRows").innerHTML = state.slots.map((s) =>
+      `<div class="plan-row" data-id="${s.id}">
+        <input aria-label="Slot name" data-k="name" value="${esc(s.name)}">
+        <input aria-label="Planned food" data-k="food" value="${esc(s.food)}">
+        <input aria-label="Protein grams" data-k="protein" type="number" inputmode="numeric" min="0" value="${s.protein}">
+        <button class="rm" data-rm="${s.id}" aria-label="Remove ${esc(s.name)}">×</button>
+      </div>`).join("");
+    renderPlanSum();
+  }
+  function renderPlanSum() {
+    const sum = state.slots.reduce((t, s) => t + (Number(s.protein) || 0), 0);
+    $("planSum").textContent = "Plan total " + sum + " / " + state.target + " g";
+    $("planSum").style.color = sum >= state.target ? "var(--done)" : "var(--warn)";
+  }
+
+  function renderProgress() {
+    const { status } = streakInfo();
+    const today = todayKey();
+    const start = addDays(today, -27);
+    const lead = (dateOf(start).getDay() + 6) % 7; // grid starts on Monday
+    let html = "";
+    for (let i = 0; i < lead; i++) html += `<div class="pad"></div>`;
+    for (let k = start; k <= today; k = addDays(k, 1)) {
+      const d = state.days[k];
+      const tip = dateOf(k).toLocaleDateString(undefined, { month: "short", day: "numeric" }) + (d ? ": " + Math.round(total(d)) + " / " + d.target + " g" : "");
+      html += `<div class="${status[k] || ""}${k === today ? " now" : ""}" title="${esc(tip)}"></div>`;
+    }
+    $("heat").innerHTML = html;
+    const xp = totalXP(), cur = rankFor(xp);
+    $("ladder").innerHTML = RANKS.map((r, i) =>
+      `<div class="${i === cur ? "cur" : i > cur ? "locked" : ""}"><span>${r.name}</span><span class="num">${r.at} XP</span></div>`).join("");
+  }
+
+  function renderFavList() {
+    $("favList").innerHTML = state.favorites.length ? state.favorites.map((f, i) =>
+      `<div><span>${esc(f.name)} <span class="num" style="color: var(--muted)">${r1(f.protein)} g</span></span><button class="undo-btn" data-unfav="${i}">Delete</button></div>`
+    ).join("") : `<p class="msg">Tick "Save as a favourite" when logging to add one-tap foods here.</p>`;
+  }
+
+  function renderAll() { renderHeader(); renderToday(); renderProgress(); }
+
+  let toastTimer;
+  function toast(text) {
+    $("toast").textContent = text; $("toast").classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("show"), 1800);
+  }
+
+  function addEntry(entry) {
+    const k = todayKey(), d = day(k, true);
+    const before = dayXP(d);
+    d.entries.push({ id: uid(), ...entry });
+    save();
+    const gained = dayXP(d) - before;
+    toast(gained ? "+" + gained + " XP" : "Logged " + r1(entry.protein) + " g");
+    renderAll();
+  }
+
+  // today: one-tap, swap, undo
+  $("slots").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.ate) {
+      const s = state.slots.find((x) => x.id === b.dataset.ate);
+      addEntry({ slot: s.id, kind: "planned", name: s.food, protein: Number(s.protein) || 0, planned: Number(s.protein) || 0 });
+    } else if (b.dataset.swap) openSheet(state.slots.find((x) => x.id === b.dataset.swap));
+    else if (b.dataset.undo) undo(b.dataset.undo);
+  });
+  $("extras").addEventListener("click", (ev) => { const b = ev.target.closest("[data-undo]"); if (b) undo(b.dataset.undo); });
+  function undo(id) {
+    const d = day(todayKey(), true);
+    d.entries = d.entries.filter((e) => e.id !== id);
+    save(); renderAll();
+  }
+  $("addExtra").addEventListener("click", () => openSheet(null));
+
+  // log sheet: favourites, lookup, manual grams
+  let sheetSlot = null, items = [], proteinEdited = false;
+  function openSheet(slot) {
+    sheetSlot = slot; items = []; proteinEdited = false;
+    $("sheetTitle").textContent = slot ? "Swap: " + slot.name : "Add food";
+    $("sheetSub").textContent = slot ? "Planned: " + slot.food + " (" + slot.protein + " g)" : "Off-plan food counts toward your grams.";
+    $("desc").value = ""; $("protein").value = ""; $("saveFav").checked = false;
+    $("estMsg").textContent = ""; $("estMsg").classList.remove("err");
+    $("sheetFavs").innerHTML = state.favorites.map((f, i) =>
+      `<button type="button" class="chip" data-fav="${i}">${esc(f.name)} <span class="num">${r1(f.protein)} g</span></button>`).join("");
+    renderItems();
+    $("sheet").returnValue = "";
+    $("sheet").showModal();
+    if (!state.favorites.length) $("desc").focus();
+  }
+
+  function renderItems() {
+    $("items").innerHTML = items.map((it, i) =>
+      `<div class="item"><div class="item-name"><b>${esc(it.name)}${it.amount ? ` <span style="font-weight: 400; color: var(--muted)">· ${esc(it.amount)}</span>` : ""}</b>
+        <small><span class="tag src-${it.source === "saved" ? "off" : it.source}">${SOURCE[it.source] || it.source}</span>${it.match ? " " + esc(it.match) : ""}</small>
+        <small class="num">${r1(it.carbs)} C · ${r1(it.fat)} F · ${Math.round(it.kcal)} kcal</small></div>
+        <input type="number" inputmode="decimal" step="0.1" min="0" value="${r1(it.protein)}" data-item="${i}" aria-label="Protein grams for ${esc(it.name)}">
+        <button type="button" class="rm" data-rmitem="${i}" aria-label="Remove ${esc(it.name)}">×</button></div>`).join("");
+    if (items.length && !proteinEdited) $("protein").value = r1(items.reduce((t, it) => t + it.protein, 0));
+    const m = sums();
+    $("macroLine").textContent = items.length ? r1(m.carbs) + " g carbs · " + r1(m.fat) + " g fat · " + Math.round(m.kcal) + " kcal" : "";
+    renderSwapHint();
+  }
+  const sums = () => items.reduce((t, it) => ({ carbs: t.carbs + it.carbs, fat: t.fat + it.fat, kcal: t.kcal + it.kcal }), { carbs: 0, fat: 0, kcal: 0 });
+
+  function renderSwapHint() {
+    const p = Number($("protein").value);
+    if (!sheetSlot || !$("protein").value) { $("swapHint").textContent = ""; return; }
+    const ok = Math.abs(p - sheetSlot.protein) <= sheetSlot.protein * SWAP_TOL;
+    $("swapHint").textContent = ok ? "Within 10% of your plan: +" + XP.swap + " XP" : "More than 10% off the plan's " + sheetSlot.protein + " g, so no swap XP. The grams still count.";
+    $("swapHint").style.color = ok ? "var(--done)" : "var(--muted)";
+  }
+
+  $("closeSheet").addEventListener("click", () => $("sheet").close("cancel"));
+  $("sheetFavs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-fav]"); if (!b) return;
+    const f = state.favorites[b.dataset.fav];
+    $("desc").value = f.name; proteinEdited = false; $("saveFav").checked = false;
+    items = [{ name: f.name, amount: "", protein: f.protein, carbs: f.carbs || 0, fat: f.fat || 0, kcal: f.kcal || 0, source: "saved", match: null }];
+    renderItems();
+  });
+  $("items").addEventListener("input", (ev) => {
+    const i = ev.target.dataset.item; if (i === undefined) return;
+    items[i].protein = Number(ev.target.value) || 0; proteinEdited = false;
+    $("protein").value = r1(items.reduce((t, it) => t + it.protein, 0));
+    renderSwapHint();
+  });
+  $("items").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-rmitem]"); if (!b) return;
+    items.splice(Number(b.dataset.rmitem), 1); proteinEdited = false; renderItems();
+  });
+  $("protein").addEventListener("input", () => { proteinEdited = true; renderSwapHint(); });
+
+  $("estimate").addEventListener("click", async () => {
+    const text = $("desc").value.trim();
+    const msg = (t, err) => { $("estMsg").textContent = t; $("estMsg").classList.toggle("err", !!err); };
+    if (!text) return msg("Describe the food first.", true);
+    if (!state.settings.url) return msg("Add your Worker URL in Settings, or type the grams below.", true);
+    if (!navigator.onLine) return msg("Offline. Pick a favourite or type the grams below.", true);
+    $("estimate").disabled = true; msg("Looking it up…");
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const res = await fetch(state.settings.url.replace(/\/+$/, "") + "/estimate", {
+        method: "POST", signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + state.settings.token },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Lookup failed (" + res.status + ")");
+      if (!data.items || !data.items.length) throw new Error("No foods found in that description.");
+      items = data.items; proteinEdited = false; renderItems();
+      msg(data.items.some((it) => it.source === "ai") ? "Check the AI estimates and adjust if needed." : "");
+    } catch (e) {
+      msg(e.name === "AbortError" ? "Lookup timed out. Try again or type the grams." : e.message, true);
+    } finally {
+      clearTimeout(timer); $("estimate").disabled = false;
+    }
+  });
+
+  $("sheet").addEventListener("close", () => {
+    if ($("sheet").returnValue !== "log") return;
+    const protein = Number($("protein").value);
+    const name = $("desc").value.trim() || (items.length ? items.map((it) => it.name).join(", ") : "");
+    if (!name || !(protein >= 0) || $("protein").value === "") return;
+    const m = sums();
+    if ($("saveFav").checked && !state.favorites.some((f) => f.name.toLowerCase() === name.toLowerCase())) {
+      state.favorites.push({ name, protein: r1(protein), carbs: r1(m.carbs), fat: r1(m.fat), kcal: Math.round(m.kcal) });
+      renderFavList();
+    }
+    addEntry({ slot: sheetSlot ? sheetSlot.id : null, kind: sheetSlot ? "swap" : "extra", name, protein: r1(protein),
+      planned: sheetSlot ? Number(sheetSlot.protein) || 0 : 0, carbs: r1(m.carbs), fat: r1(m.fat), kcal: Math.round(m.kcal),
+      sources: [...new Set(items.map((it) => it.source))] });
+  });
+  // block the submit (and keep the sheet open) when nothing would be logged
+  $("sheetForm").addEventListener("submit", (ev) => {
+    const missing = !$("desc").value.trim() && !items.length ? "Describe the food or pick a favourite."
+      : $("protein").value === "" ? "Enter the protein grams, or tap Estimate." : "";
+    if (missing) { ev.preventDefault(); $("estMsg").textContent = missing; $("estMsg").classList.add("err"); }
+  });
+
+  // plan editing
+  $("target").addEventListener("change", () => {
+    const v = Math.round(Number($("target").value));
+    if (v >= 20 && v <= 500) {
+      state.target = v;
+      // today follows the new target; past days keep theirs
+      const d = state.days[todayKey()]; if (d) d.target = v;
+      save(); renderPlanSum(); renderAll();
+    } else $("target").value = state.target;
+  });
+  $("planRows").addEventListener("change", (ev) => {
+    const row = ev.target.closest("[data-id]"); if (!row) return;
+    const s = state.slots.find((x) => x.id === row.dataset.id);
+    const k = ev.target.dataset.k;
+    if (k === "protein") s.protein = Math.max(0, Math.round(Number(ev.target.value) || 0));
+    else if (ev.target.value.trim()) s[k] = ev.target.value.trim();
+    else ev.target.value = s[k];
+    syncTodaySlots(); save(); renderPlanSum(); renderAll();
+  });
+  $("planRows").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-rm]"); if (!b) return;
+    if (state.slots.length <= 1) { $("planMsg").textContent = "Keep at least one slot."; return; }
+    state.slots = state.slots.filter((s) => s.id !== b.dataset.rm);
+    syncTodaySlots(); save(); renderPlan(); renderAll();
+  });
+  $("addSlot").addEventListener("click", () => {
+    state.slots.push({ id: "s" + uid(), name: "Snack", food: "Protein bar", protein: 20 });
+    syncTodaySlots(); save(); renderPlan(); renderAll();
+  });
+  function syncTodaySlots() { const d = state.days[todayKey()]; if (d) d.slots = state.slots.map((s) => s.id); }
+
+  // settings
+  $("workerUrl").value = state.settings.url;
+  $("workerToken").value = state.settings.token;
+  $("testWorker").addEventListener("click", async () => {
+    state.settings.url = $("workerUrl").value.trim();
+    state.settings.token = $("workerToken").value.trim();
+    save();
+    if (!state.settings.url) { $("workerMsg").textContent = "Saved. Lookup is off until you add a URL."; return; }
+    $("workerMsg").textContent = "Testing…";
+    try {
+      const base = state.settings.url.replace(/\/+$/, "");
+      const health = await fetch(base + "/health");
+      if (!health.ok) throw new Error("Worker answered " + health.status);
+      // an empty request checks the token without spending a lookup
+      const auth = await fetch(base + "/estimate", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + state.settings.token }, body: "{}" });
+      $("workerMsg").textContent = auth.status === 401 ? "Worker reached, but the app token doesn't match." : "Connected. Lookups are ready.";
+    } catch (e) {
+      $("workerMsg").textContent = "Couldn't reach the Worker: " + e.message;
+    }
+  });
+  $("favList").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-unfav]"); if (!b) return;
+    state.favorites.splice(Number(b.dataset.unfav), 1); save(); renderFavList();
+  });
+  $("exportData").addEventListener("click", () => {
+    const copy = { ...state, settings: { url: state.settings.url, token: "" } };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(copy, null, 2)], { type: "application/json" }));
+    a.download = "protein-quest-" + todayKey() + ".json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    $("dataMsg").textContent = "Exported (the app token is left out).";
+  });
+  $("importData").addEventListener("change", async (ev) => {
+    const file = ev.target.files[0]; if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data.days || !Array.isArray(data.slots)) throw new Error("not a Protein Quest backup");
+      const settings = state.settings;
+      state = Object.assign(blank(), data, { settings: { url: data.settings?.url || settings.url, token: settings.token } });
+      save(); renderPlan(); renderFavList(); renderAll();
+      $("dataMsg").textContent = "Backup restored.";
+    } catch (e) { $("dataMsg").textContent = "Import failed: " + e.message; }
+    ev.target.value = "";
+  });
+  // reset with in-page confirm (no dialogs)
+  let armed = false;
+  $("reset").addEventListener("click", () => {
+    if (!armed) { armed = true; $("reset").textContent = "Tap again to erase"; $("dataMsg").textContent = ""; return; }
+    armed = false; state = blank(); save();
+    $("reset").textContent = "Reset everything"; $("dataMsg").textContent = "Everything cleared.";
+    $("workerUrl").value = ""; $("workerToken").value = "";
+    renderPlan(); renderFavList(); renderAll();
+  });
+
+  // tabs
+  document.querySelectorAll("[data-tab]").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === t));
+    ["today", "plan", "progress", "settings"].forEach((p) => { $("panel-" + p).hidden = p !== t.dataset.tab; });
+    if (t.dataset.tab === "progress") renderProgress();
+    try { localStorage.setItem(KEY + "-tab", t.dataset.tab); } catch (e) {}
+  }));
+  try { const t = localStorage.getItem(KEY + "-tab"); if (t) document.querySelector(`[data-tab="${t}"]`)?.click(); } catch (e) {}
+
+  // a phone left open overnight should roll over to the new day
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) renderAll(); });
+
+  renderPlan(); renderFavList(); renderAll();
+
+  // offline support: cache the app after the first visit (skipped where service workers aren't allowed)
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+})();
+</script>

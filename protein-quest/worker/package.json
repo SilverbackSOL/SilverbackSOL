@@ -1,0 +1,20 @@
+{
+  "name": "protein-quest-lookup",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that estimates food macros for Protein Quest",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "tsc"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.152.0"
+  },
+  "private": true
+}

@@ -1,0 +1,20 @@
+name = "protein-quest-lookup"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# Comma-separated list of origins allowed to call the Worker, e.g. "https://silverbacksol.github.io".
+# "*" allows any origin; the APP_TOKEN secret still has to match.
+ALLOWED_ORIGINS = "*"
+
+# Caps lookups at 30 a minute so a leaked token can't run up the Anthropic bill.
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
+# Secrets (set with `npx wrangler secret put NAME`, never committed):
+#   ANTHROPIC_API_KEY  required
+#   APP_TOKEN          required, any long random string; paste the same value into the app's Settings
+#   USDA_API_KEY       optional, free from https://fdc.nal.usda.gov/api-key-signup ; DEMO_KEY is used otherwise
